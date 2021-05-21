@@ -21,6 +21,10 @@
 		_EdgeTex("Edge Texture", 2D) = "white" {} //边缘高亮纹理
 		_EdgeIntensity("Edge Intensity", float) = 10.0
 		_EdgeExponent("Edge Falloff Exponent", float) = 6.0
+
+		//Intersection properties - if the values are close to the outer edge ones the two effects will blend properly
+		_IntersectIntensity("Intersection Intensity", float) = 10.0
+		_IntersectExponent("Intersection Falloff Exponent", float) = 6.0
 	}
 	SubShader
 	{
@@ -46,6 +50,7 @@
 			{
 				float4 vertex : POSITION;
 				float2 uv : TEXCOORD0;
+				
 			};
 
 			struct v2f
@@ -53,6 +58,8 @@
 				float4 vertex : SV_POSITION;
 				float2 uv : TEXCOORD0;
 				float4 vertexObjPos : TEXCOORD1;
+				float4 screenPos : TEXCOORD2;
+				float depth : TEXCOORD3;
 			};
 
 			float4 _Color;
@@ -76,12 +83,26 @@
 			float _EdgeIntensity;
 			float _EdgeExponent;
 
+			//Intersection variables
+			sampler2D _CameraDepthNormalsTexture; //Automatically filled by Unity
+			float _IntersectIntensity;
+			float _IntersectExponent;
+
 			v2f vert (appdata v)
 			{
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
 				o.uv = TRANSFORM_TEX(v.uv,_PulseTex);
 				o.vertexObjPos = v.vertex;
+				// inline float4 ComputeScreenPos (float4 pos) 
+				// {
+					// 	float4 o = pos * 0.5f;
+					// 	o.xy = float2(o.x, o.y*_ProjectionParams.x) + o.w;
+					// 	o.zw = pos.zw;
+					// 	return o;
+				// }
+				o.screenPos = ComputeScreenPos(o.vertex);
+				o.depth = -mul(UNITY_MATRIX_MV, v.vertex).z * _ProjectionParams.w;
 				return o;
 			}
 			
@@ -90,16 +111,23 @@
 				float4 pulseTex = tex2D(_PulseTex,i.uv);
 				float horizontalDist = abs(i.vertexObjPos.x);
 				fixed4 pulseTerm = pulseTex * _Color * _PulseIntensity * abs(sin(_Time.y * _PulseTimeScale - horizontalDist * _PulsePosScale + pulseTex.r * _PulseTexOffsetScale));
+				
+				//Hex edge pulse logic
 				fixed4 hexEdgeTex = tex2D(_HexEdgeTex, i.uv);
 				float verticalDist = abs(i.vertexObjPos.z);
 				fixed4 hexEdgeTerm = hexEdgeTex * _HexEdgeColor * _HexEdgeIntensity *
 				max(sin((horizontalDist + verticalDist) * _HexEdgePosScale - _Time.y * _HexEdgeTimeScale) - _HexEdgeWidthModifier, 0.0f) *
 				(1 / (1 - _HexEdgeWidthModifier));
 
+				//Outer edge logic
 				fixed4 edgeTex = tex2D(_EdgeTex, i.uv);
 				fixed4 edgeTerm = pow(edgeTex.a, _EdgeExponent) * _Color * _EdgeIntensity;
 
-				return fixed4(_Color.rgb + pulseTerm.rgb + hexEdgeTerm.rgb + edgeTerm, _Color.a);
+				float diff = DecodeFloatRG(tex2D(_CameraDepthNormalsTexture, i.screenPos.xy / i.screenPos.w).zw) - i.depth;
+				float intersectGradient = 1 - min(diff / _ProjectionParams.w, 1.0f);
+				fixed4 intersectTerm = _Color * pow(intersectGradient, _IntersectExponent) * _IntersectIntensity;
+
+				return fixed4(_Color.rgb + pulseTerm.rgb + hexEdgeTerm.rgb + edgeTerm + intersectTerm, _Color.a);
 			}
 
 			ENDHLSL
