@@ -1,14 +1,24 @@
 ﻿Shader "Lexdev/CaseStudies/OverwatchShield"
 {
-	Properties
-	{
-		
-	}
-	SubShader
-	{
-		Pass
-		{
-			HLSLPROGRAM
+    Properties
+    {
+    	//_[Name](“[Inspector Name]”, [Type]) = [DefaultValue]
+		_Color("Color",COLOR) = (0,0,0,0.5)
+    }
+    SubShader
+    {
+        Tags
+        {
+            "RenderType" = "Transparent" //
+            "Queue" = "Transparent" //透明队列
+        }
+
+        Cull Off //Disable backface culling
+    	Blend SrcAlpha One //Additive混合模式
+
+        Pass
+        {
+            HLSLPROGRAM
 
 			#pragma vertex vert
 			#pragma fragment frag
@@ -25,6 +35,8 @@
 				float4 vertex : SV_POSITION;
 			};
 
+            float4 _Color;
+
 			v2f vert (appdata v)
 			{
 				v2f o;
@@ -35,10 +47,10 @@
 			fixed4 frag (v2f i) : SV_Target
 			{
 				//final output
-				return fixed4(1.0f,0.5f,0.0f,1.0f);
+				return _Color;
 			}
 
 			ENDHLSL
-		}
-	}
+        }
+    }
 }
