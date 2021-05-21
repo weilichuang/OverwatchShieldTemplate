@@ -17,6 +17,10 @@
 		_HexEdgeTimeScale("Hex Edge Time Scale", float) = 2.0
 		_HexEdgeWidthModifier("Hex Edge Width Modifier", Range(0,1)) = 0.8 //修改边缘sin高度
 		_HexEdgePosScale("Hex Edge Position Scale", float) = 80.0
+
+		_EdgeTex("Edge Texture", 2D) = "white" {} //边缘高亮纹理
+		_EdgeIntensity("Edge Intensity", float) = 10.0
+		_EdgeExponent("Edge Falloff Exponent", float) = 6.0
 	}
 	SubShader
 	{
@@ -67,6 +71,11 @@
 			float _HexEdgeWidthModifier;
 			float _HexEdgePosScale;
 
+			sampler2D _EdgeTex;
+			float4 _EdgeTex_ST;
+			float _EdgeIntensity;
+			float _EdgeExponent;
+
 			v2f vert (appdata v)
 			{
 				v2f o;
@@ -86,7 +95,11 @@
 				fixed4 hexEdgeTerm = hexEdgeTex * _HexEdgeColor * _HexEdgeIntensity *
 				max(sin((horizontalDist + verticalDist) * _HexEdgePosScale - _Time.y * _HexEdgeTimeScale) - _HexEdgeWidthModifier, 0.0f) *
 				(1 / (1 - _HexEdgeWidthModifier));
-				return fixed4(_Color.rgb + pulseTerm.rgb + hexEdgeTerm.rgb, _Color.a);
+
+				fixed4 edgeTex = tex2D(_EdgeTex, i.uv);
+				fixed4 edgeTerm = pow(edgeTex.a, _EdgeExponent) * _Color * _EdgeIntensity;
+
+				return fixed4(_Color.rgb + pulseTerm.rgb + hexEdgeTerm.rgb + edgeTerm, _Color.a);
 			}
 
 			ENDHLSL
